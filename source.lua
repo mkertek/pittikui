@@ -1,4 +1,5 @@
-local Players = game:GetService("Players")
+
+local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -35,8 +36,11 @@ local PittikUI = {
     ConfigFolder = "PittikUIConfigs",
     ToggleKey = Enum.KeyCode.RightControl,
     _accentTexts = {},
+    _accentDimTexts = {},
     _accentBgs = {},
     _accentStrokes = {},
+    _accentScrollBars = {},
+    _toggles = {},
     _listeningForKeybind = false,
 }
 
@@ -50,12 +54,20 @@ function PittikUI:_TrackText(label)
     table.insert(self._accentTexts, label)
 end
 
+function PittikUI:_TrackAccentDimText(label)
+    table.insert(self._accentDimTexts, label)
+end
+
 function PittikUI:_TrackBg(frame)
     table.insert(self._accentBgs, frame)
 end
 
 function PittikUI:_TrackStroke(stroke)
     table.insert(self._accentStrokes, stroke)
+end
+
+function PittikUI:_TrackScrollBar(scrollFrame)
+    table.insert(self._accentScrollBars, scrollFrame)
 end
 
 function PittikUI:SetAccentColor(color)
@@ -74,6 +86,14 @@ function PittikUI:SetAccentColor(color)
             table.remove(self._accentTexts, i)
         end
     end
+    for i = #self._accentDimTexts, 1, -1 do
+        local lbl = self._accentDimTexts[i]
+        if lbl and lbl.Parent then
+            pcall(function() lbl.TextColor3 = T.AccentDim end)
+        else
+            table.remove(self._accentDimTexts, i)
+        end
+    end
     for i = #self._accentBgs, 1, -1 do
         local bg = self._accentBgs[i]
         if bg and bg.Parent then
@@ -88,6 +108,24 @@ function PittikUI:SetAccentColor(color)
             pcall(function() s.Color = color end)
         else
             table.remove(self._accentStrokes, i)
+        end
+    end
+    for i = #self._accentScrollBars, 1, -1 do
+        local sf = self._accentScrollBars[i]
+        if sf and sf.Parent then
+            pcall(function() sf.ScrollBarImageColor3 = color end)
+        else
+            table.remove(self._accentScrollBars, i)
+        end
+    end
+    for i = #self._toggles, 1, -1 do
+        local item = self._toggles[i]
+        if item and item.Bg and item.Bg.Parent then
+            if item.GetState() then
+                pcall(function() item.Bg.BackgroundColor3 = color end)
+            end
+        else
+            table.remove(self._toggles, i)
         end
     end
 
@@ -478,6 +516,7 @@ function PittikUI:CreateWindow(options)
         Size = UDim2.new(0.7, -80, 1, 0),
         Position = UDim2.new(0, 14, 0, 0),
         BackgroundTransparency = 1,
+        RichText = true,
         Text = title,
         TextColor3 = T.TextAccent,
         TextSize = 16,
@@ -735,6 +774,7 @@ function Window:AddTab(options)
         Visible = false,
         Parent = self.ContentArea,
     })
+    PittikUI:_TrackScrollBar(tabPage)
     Util.Padding(tabPage, 4, 0, 4, 0)
     local pageLayout = Util.ListLayout(tabPage, 8)
     Util.AutoResize(tabPage, pageLayout)
@@ -952,6 +992,7 @@ function Window:_AddSection(tabObj, options)
             Font = FONT_MAIN,
             Parent = btn,
         })
+        PittikUI:_TrackAccentDimText(arrow)
         local stroke = btn:FindFirstChildOfClass("UIStroke")
         btn.MouseEnter:Connect(function()
             Util.Tween(btn, 0.15, { BackgroundColor3 = T.CardHover })
@@ -1044,6 +1085,11 @@ function Window:_AddSection(tabObj, options)
             updateVisual()
             callback(state)
         end)
+
+        table.insert(PittikUI._toggles, {
+            Bg = swBg,
+            GetState = function() return state end
+        })
 
         element = { Instance = frame, Type = "Toggle", Value = state }
         function element:Set(val)
@@ -1244,6 +1290,7 @@ function Window:_AddSection(tabObj, options)
             Font = FONT_MAIN,
             Parent = mainBar,
         })
+        PittikUI:_TrackAccentDimText(arrowLbl)
 
         local optContainer = Util.Create("Frame", {
             Size = UDim2.new(1, 0, 0, 0),
