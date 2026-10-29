@@ -9,7 +9,7 @@ local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
 
 local PittikUI = {
-    Version = "1.0",
+    Version = "1.2",
     Windows = {},
     Theme = {
         Background       = Color3.fromRGB(12, 16, 22),
@@ -291,7 +291,6 @@ function PittikUI:OpenColorPopup(anchor, startColor, onChange)
     local hue, sat, val = Color3.toHSV(startColor or Color3.new(1, 1, 1))
     local POP_W, POP_H = 190, 150
 
-    -- Palet açıkken dışına tıklayınca kapanması için görünmez ekran
     local catcher = Util.Create("TextButton", {
         Name = "ColorPopupCatcher",
         Size = UDim2.new(1, 0, 1, 0),
@@ -315,7 +314,6 @@ function PittikUI:OpenColorPopup(anchor, startColor, onChange)
     Util.Corner(popup, UDim.new(0, 4))
     Util.Stroke(popup, T.Accent, 1, 0.45)
 
-    -- Üst satır: hex kodu + canlı önizleme
     local hexLbl = Util.Create("TextLabel", {
         Size = UDim2.new(1, -48, 0, 16),
         Position = UDim2.new(0, 12, 0, 7),
@@ -336,10 +334,9 @@ function PittikUI:OpenColorPopup(anchor, startColor, onChange)
         ZIndex = 101,
         Parent = popup,
     })
-    Util.Corner(preview, UDim.new(0, 4)) -- kare
+    Util.Corner(preview, UDim.new(0, 4))
     Util.Stroke(preview, Color3.new(1, 1, 1), 1, 0.4)
 
-    -- Doymuşluk / Parlaklık alanı
     local svField = Util.Create("Frame", {
         Size = UDim2.new(1, -16, 0, 92),
         Position = UDim2.new(0, 8, 0, 28),
@@ -392,7 +389,7 @@ function PittikUI:OpenColorPopup(anchor, startColor, onChange)
         ZIndex = 103,
         Parent = svField,
     })
-    Util.Corner(svCursor, UDim.new(0, 2)) -- kare imleç
+    Util.Corner(svCursor, UDim.new(0, 2))
     Util.Stroke(svCursor, Color3.new(1, 1, 1), 2, 0)
 
     local svBtn = Util.Create("TextButton", {
@@ -403,7 +400,6 @@ function PittikUI:OpenColorPopup(anchor, startColor, onChange)
         Parent = svField,
     })
 
-    -- Ton (hue) çubuğu
     local hueBar = Util.Create("Frame", {
         Size = UDim2.new(1, -16, 0, 14),
         Position = UDim2.new(0, 8, 0, 126),
@@ -435,7 +431,7 @@ function PittikUI:OpenColorPopup(anchor, startColor, onChange)
         ZIndex = 103,
         Parent = hueBar,
     })
-    Util.Corner(hueCursor, UDim.new(0, 2)) -- kare imleç
+    Util.Corner(hueCursor, UDim.new(0, 2))
 
     local hueBtn = Util.Create("TextButton", {
         Size = UDim2.new(1, 0, 1, 0),
@@ -470,13 +466,13 @@ function PittikUI:OpenColorPopup(anchor, startColor, onChange)
         sat = math.clamp((pos.X - p.X) / s.X, 0, 1)
         val = math.clamp(1 - (pos.Y - p.Y) / s.Y, 0, 1)
         refresh()
-        onChange(Color3.fromHSV(hue, sat, val)) -- ANINDA uygula
+        onChange(Color3.fromHSV(hue, sat, val))
     end
 
     local function applyHue(pos)
         hue = math.clamp((pos.X - hueBar.AbsolutePosition.X) / hueBar.AbsoluteSize.X, 0, 0.999)
         refresh()
-        onChange(Color3.fromHSV(hue, sat, val)) -- ANINDA uygula
+        onChange(Color3.fromHSV(hue, sat, val))
     end
 
     svBtn.MouseButton1Down:Connect(function()
@@ -517,7 +513,6 @@ function PittikUI:OpenColorPopup(anchor, startColor, onChange)
 
     catcher.MouseButton1Click:Connect(close)
 
-    -- Karenin hemen altına (yer yoksa üstüne) konumlandır ve aç
     do
         local cam = workspace.CurrentCamera
         local vp = cam and cam.ViewportSize or Vector2.new(1920, 1080)
@@ -731,6 +726,31 @@ function PittikUI:Notify(options)
     end)
 end
 
+-- ============================================================
+-- Önceki çalıştırmalardan kalan eski pencereleri HER YERDEN sil
+-- (CoreGui, gethui, PlayerGui) — çift/eski pencere kalmasın
+-- ============================================================
+local function DestroyOldUI()
+    local parents = {}
+    pcall(function() table.insert(parents, CoreGui) end)
+    pcall(function() if gethui then table.insert(parents, gethui()) end end)
+    pcall(function()
+        local pg = Player:FindFirstChild("PlayerGui")
+        if pg then table.insert(parents, pg) end
+    end)
+    for _, parent in ipairs(parents) do
+        for _, guiName in ipairs({ "PittikUIMain", "PittikUINotifs" }) do
+            local old = parent:FindFirstChild(guiName)
+            if old then
+                old:Destroy()
+                if guiName == "PittikUINotifs" then
+                    NotifContainer, NotifGui = nil, nil
+                end
+            end
+        end
+    end
+end
+
 local Window = {}
 Window.__index = Window
 
@@ -745,8 +765,14 @@ function PittikUI:CreateWindow(options)
         self.ConfigFolder = options.ConfigFolder
     end
 
-    local existing = CoreGui:FindFirstChild("PittikUIMain")
-    if existing then existing:Destroy() end
+    -- Eski pencereleri temizle + ölü window kayıtlarını sil
+    DestroyOldUI()
+    for i = #PittikUI.Windows, 1, -1 do
+        local w = PittikUI.Windows[i]
+        if not w.ScreenGui or not w.ScreenGui.Parent then
+            table.remove(PittikUI.Windows, i)
+        end
+    end
 
     local screenGui = Util.Create("ScreenGui", {
         Name = "PittikUIMain",
@@ -783,7 +809,6 @@ function PittikUI:CreateWindow(options)
 
     -- ============================================================
     -- BAŞLIK ÇUBUĞU: Başlık + Sekmeler + Pencere butonları TEK SATIRDA
-    -- (eski ayrı sekme satırı kaldırıldı -> içerik alanı büyüdü)
     -- ============================================================
     local titleBar = Util.Create("Frame", {
         Size = UDim2.new(1, 0, 0, 38),
@@ -824,7 +849,7 @@ function PittikUI:CreateWindow(options)
     })
     PittikUI:_TrackText(titleLabel)
 
-    -- Sekmeler: başlığın sağına dinamik olarak yerleşir
+    -- Sekmeler: başlığın sağına yerleşir
     local tabBar = Util.Create("ScrollingFrame", {
         Name = "TabBar",
         BackgroundTransparency = 1,
@@ -841,18 +866,21 @@ function PittikUI:CreateWindow(options)
         tabBar.CanvasSize = UDim2.new(0, tabLayout.AbsoluteContentSize.X + 8, 0, 0)
     end)
 
-    local CONTROLS_RESERVE = 78 -- sağdaki pencere butonları için ayrılan alan
+    local CONTROLS_RESERVE = 78
     local function layoutTabs()
         local tw = math.clamp(titleLabel.TextBounds.X, 24, 280)
         local startX = 14 + tw + 18
-        tabBar.Position = UDim2.new(0, startX, 0, 5)
-        tabBar.Size = UDim2.new(1, -(startX + CONTROLS_RESERVE), 1, -10)
+        tabBar.Position = UDim2.new(0, startX, 0, 4)
+        tabBar.Size = UDim2.new(1, -(startX + CONTROLS_RESERVE), 1, -8)
     end
-    titleLabel:GetPropertyChangedSignal("TextBounds"):Connect(layoutTabs)
-    task.defer(layoutTabs)
-    task.delay(0.1, layoutTabs)
+    layoutTabs() -- ilk karede anında uygula
+    titleLabel:GetPropertyChangedSignal("TextBounds"):Connect(function()
+        task.defer(layoutTabs)
+    end)
+    titleLabel:GetPropertyChangedSignal("Text"):Connect(function()
+        task.defer(layoutTabs)
+    end)
 
-    -- Pencere butonları (en sağda)
     local controlsFrame = Util.Create("Frame", {
         Size = UDim2.new(0, 60, 0, 38),
         AnchorPoint = Vector2.new(1, 0),
@@ -891,7 +919,6 @@ function PittikUI:CreateWindow(options)
     Util.Corner(closeBtn)
     Util.Stroke(closeBtn, T.Danger, 1, 0.7)
 
-    -- İçerik alanı: artık başlık çubuğunun hemen altında (ekstra alan kazanıldı)
     local contentArea = Util.Create("Frame", {
         Name = "ContentArea",
         Size = UDim2.new(1, -16, 1, -54),
@@ -953,7 +980,7 @@ function PittikUI:CreateWindow(options)
     end
 
     Util.Create("TextLabel", {
-        Size = UDim2.new(0, 60, 0, 14),
+        Size = UDim2.new(0, 80, 0, 14),
         Position = UDim2.new(0, 6, 1, -16),
         BackgroundTransparency = 1,
         Text = "PittikUI v" .. PittikUI.Version,
@@ -1003,7 +1030,6 @@ end
 
 function Window:SetTitle(newTitle)
     self.TitleLabel.Text = newTitle
-    -- TextBounds değişince sekmeler otomatik yeniden konumlanır
 end
 
 function Window:AddTab(options)
@@ -1299,8 +1325,6 @@ function Window:_AddSection(tabObj, options)
 
     -- ============================================================
     -- TOGGLE: [İsim] [kare renk kutusu] .......... [küçük aç/kapa]
-    -- Renk kutusu ismin hemen sağında, aç/kapa en sağda.
-    -- Satırın herhangi bir boş yerine tıklamak da toggle'lar.
     -- ============================================================
     function S:AddToggle(opts)
         opts = opts or {}
@@ -1310,7 +1334,6 @@ function Window:_AddSection(tabObj, options)
         local callback = opts.Callback or function() end
         local state = default
 
-        -- Renk seçici entegrasyonu: ColorPicker = true
         local hasColor = opts.ColorPicker == true or opts.ColorDefault ~= nil or opts.ColorFlag ~= nil
         local currentColor = opts.ColorDefault or Color3.fromRGB(0, 255, 128)
         local colorCallback = opts.ColorCallback or function() end
@@ -1329,7 +1352,6 @@ function Window:_AddSection(tabObj, options)
         local element
         local colorFlagEntry
 
-        -- Sol taraf: isim + renk kutusu (tüm satır tıklanabilir)
         local clickBtn = Util.Create("TextButton", {
             Size = UDim2.new(1, 0, 1, 0),
             BackgroundTransparency = 1,
@@ -1354,7 +1376,6 @@ function Window:_AddSection(tabObj, options)
             Parent = clickBtn,
         })
 
-        -- Kare renk paleti butonu (ismin hemen sağında)
         local swatch
         if hasColor then
             swatch = Util.Create("TextButton", {
@@ -1366,7 +1387,7 @@ function Window:_AddSection(tabObj, options)
                 LayoutOrder = 2,
                 Parent = clickBtn,
             })
-            Util.Corner(swatch, UDim.new(0, 4)) -- kare
+            Util.Corner(swatch, UDim.new(0, 4))
             local swStroke = Util.Stroke(swatch, Color3.new(1, 1, 1), 1, 0.55)
 
             swatch.MouseEnter:Connect(function()
@@ -1388,7 +1409,6 @@ function Window:_AddSection(tabObj, options)
             end)
         end
 
-        -- Küçültülmüş aç/kapa düğmesi (en sağda)
         local swBg = Util.Create("TextButton", {
             Size = UDim2.new(0, 32, 0, 16),
             Position = UDim2.new(1, -40, 0.5, -8),
@@ -1923,7 +1943,7 @@ function Window:_AddSection(tabObj, options)
             AutoButtonColor = false,
             Parent = cpFrame,
         })
-        Util.Corner(swatch, UDim.new(0, 4)) -- kare
+        Util.Corner(swatch, UDim.new(0, 4))
         local swStroke = Util.Stroke(swatch, Color3.new(1, 1, 1), 1, 0.6)
 
         swatch.MouseEnter:Connect(function()
