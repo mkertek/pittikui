@@ -781,6 +781,10 @@ function PittikUI:CreateWindow(options)
     Util.Corner(mainFrame)
     Util.Stroke(mainFrame, T.Accent, 1.5, 0.2)
 
+    -- ============================================================
+    -- BAŞLIK ÇUBUĞU: Başlık + Sekmeler + Pencere butonları TEK SATIRDA
+    -- (eski ayrı sekme satırı kaldırıldı -> içerik alanı büyüdü)
+    -- ============================================================
     local titleBar = Util.Create("Frame", {
         Size = UDim2.new(1, 0, 0, 38),
         BackgroundColor3 = T.Surface,
@@ -806,7 +810,8 @@ function PittikUI:CreateWindow(options)
     PittikUI:_TrackBg(titleLine)
 
     local titleLabel = Util.Create("TextLabel", {
-        Size = UDim2.new(0.7, -80, 1, 0),
+        Size = UDim2.new(0, 0, 1, 0),
+        AutomaticSize = Enum.AutomaticSize.X,
         Position = UDim2.new(0, 14, 0, 0),
         BackgroundTransparency = 1,
         RichText = true,
@@ -815,34 +820,50 @@ function PittikUI:CreateWindow(options)
         TextSize = 16,
         Font = FONT_MAIN,
         TextXAlignment = Enum.TextXAlignment.Left,
-        TextTruncate = Enum.TextTruncate.AtEnd,
         Parent = titleBar,
     })
     PittikUI:_TrackText(titleLabel)
 
-    local brandLabel = Util.Create("TextLabel", {
-        Size = UDim2.new(0, 50, 1, 0),
-        Position = UDim2.new(1, -118, 0, 0),
+    -- Sekmeler: başlığın sağına dinamik olarak yerleşir
+    local tabBar = Util.Create("ScrollingFrame", {
+        Name = "TabBar",
         BackgroundTransparency = 1,
-        Text = "PittikUI",
-        TextColor3 = T.TextDim,
-        TextTransparency = 0.5,
-        TextSize = 9,
-        Font = FONT_SMALL,
-        TextXAlignment = Enum.TextXAlignment.Right,
+        ScrollBarThickness = 0,
+        ScrollingDirection = Enum.ScrollingDirection.X,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        BorderSizePixel = 0,
+        ClipsDescendants = false,
         Parent = titleBar,
     })
+    local tabLayout = Util.ListLayout(tabBar, 4, Enum.FillDirection.Horizontal,
+        Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center)
+    tabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        tabBar.CanvasSize = UDim2.new(0, tabLayout.AbsoluteContentSize.X + 8, 0, 0)
+    end)
 
+    local CONTROLS_RESERVE = 78 -- sağdaki pencere butonları için ayrılan alan
+    local function layoutTabs()
+        local tw = math.clamp(titleLabel.TextBounds.X, 24, 280)
+        local startX = 14 + tw + 18
+        tabBar.Position = UDim2.new(0, startX, 0, 5)
+        tabBar.Size = UDim2.new(1, -(startX + CONTROLS_RESERVE), 1, -10)
+    end
+    titleLabel:GetPropertyChangedSignal("TextBounds"):Connect(layoutTabs)
+    task.defer(layoutTabs)
+    task.delay(0.1, layoutTabs)
+
+    -- Pencere butonları (en sağda)
     local controlsFrame = Util.Create("Frame", {
         Size = UDim2.new(0, 60, 0, 38),
-        Position = UDim2.new(1, -60, 0, 0),
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, -6, 0, 0),
         BackgroundTransparency = 1,
         Parent = titleBar,
     })
 
     local minimizeBtn = Util.Create("TextButton", {
-        Size = UDim2.new(0, 28, 0, 28),
-        Position = UDim2.new(0, 0, 0.5, -14),
+        Size = UDim2.new(0, 26, 0, 26),
+        Position = UDim2.new(0, 0, 0.5, -13),
         BackgroundColor3 = T.SurfaceAlt,
         BorderSizePixel = 0,
         Text = "—",
@@ -856,8 +877,8 @@ function PittikUI:CreateWindow(options)
     Util.Stroke(minimizeBtn, T.Border, 1, 0.6)
 
     local closeBtn = Util.Create("TextButton", {
-        Size = UDim2.new(0, 28, 0, 28),
-        Position = UDim2.new(0, 30, 0.5, -14),
+        Size = UDim2.new(0, 26, 0, 26),
+        Position = UDim2.new(0, 32, 0.5, -13),
         BackgroundColor3 = T.SurfaceAlt,
         BorderSizePixel = 0,
         Text = "✕",
@@ -870,43 +891,11 @@ function PittikUI:CreateWindow(options)
     Util.Corner(closeBtn)
     Util.Stroke(closeBtn, T.Danger, 1, 0.7)
 
-    local tabBarContainer = Util.Create("Frame", {
-        Size = UDim2.new(1, 0, 0, 34),
-        Position = UDim2.new(0, 0, 0, 38),
-        BackgroundColor3 = T.Surface,
-        BackgroundTransparency = 0.3,
-        BorderSizePixel = 0,
-        Parent = mainFrame,
-    })
-    Util.Create("Frame", {
-        Size = UDim2.new(1, 0, 0, 1),
-        Position = UDim2.new(0, 0, 1, -1),
-        BackgroundColor3 = T.Border,
-        BorderSizePixel = 0,
-        Parent = tabBarContainer,
-    })
-
-    local tabBar = Util.Create("ScrollingFrame", {
-        Name = "TabBar",
-        Size = UDim2.new(1, -16, 1, -4),
-        Position = UDim2.new(0, 8, 0, 2),
-        BackgroundTransparency = 1,
-        ScrollBarThickness = 0,
-        ScrollingDirection = Enum.ScrollingDirection.X,
-        CanvasSize = UDim2.new(0, 0, 0, 0),
-        BorderSizePixel = 0,
-        Parent = tabBarContainer,
-    })
-    local tabLayout = Util.ListLayout(tabBar, 4, Enum.FillDirection.Horizontal,
-        Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center)
-    tabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        tabBar.CanvasSize = UDim2.new(0, tabLayout.AbsoluteContentSize.X + 8, 0, 0)
-    end)
-
+    -- İçerik alanı: artık başlık çubuğunun hemen altında (ekstra alan kazanıldı)
     local contentArea = Util.Create("Frame", {
         Name = "ContentArea",
-        Size = UDim2.new(1, -16, 1, -82),
-        Position = UDim2.new(0, 8, 0, 74),
+        Size = UDim2.new(1, -16, 1, -54),
+        Position = UDim2.new(0, 8, 0, 46),
         BackgroundTransparency = 1,
         ClipsDescendants = true,
         Parent = mainFrame,
@@ -1014,6 +1003,7 @@ end
 
 function Window:SetTitle(newTitle)
     self.TitleLabel.Text = newTitle
+    -- TextBounds değişince sekmeler otomatik yeniden konumlanır
 end
 
 function Window:AddTab(options)
@@ -1023,7 +1013,7 @@ function Window:AddTab(options)
 
     local tabBtn = Util.Create("TextButton", {
         Name = "Tab_" .. name,
-        Size = UDim2.new(0, 0, 0, 26),
+        Size = UDim2.new(0, 0, 0, 24),
         AutomaticSize = Enum.AutomaticSize.X,
         BackgroundColor3 = T.SurfaceAlt,
         BackgroundTransparency = 0.5,
@@ -1041,7 +1031,7 @@ function Window:AddTab(options)
         BackgroundTransparency = 1,
         Text = name,
         TextColor3 = T.TextDim,
-        TextSize = 12,
+        TextSize = 11,
         Font = FONT_BODY,
         Parent = tabBtn,
     })
@@ -1307,6 +1297,11 @@ function Window:_AddSection(tabObj, options)
         table.insert(self.Elements, { Instance = btnFrame, Type = "Button" })
     end
 
+    -- ============================================================
+    -- TOGGLE: [İsim] [kare renk kutusu] .......... [küçük aç/kapa]
+    -- Renk kutusu ismin hemen sağında, aç/kapa en sağda.
+    -- Satırın herhangi bir boş yerine tıklamak da toggle'lar.
+    -- ============================================================
     function S:AddToggle(opts)
         opts = opts or {}
         local tName = opts.Name or "Toggle"
@@ -1331,75 +1326,45 @@ function Window:_AddSection(tabObj, options)
         Util.Corner(frame)
         Util.Stroke(frame, T.Border, 1, 0.7)
 
-        Util.Create("TextLabel", {
-            Size = UDim2.new(1, hasColor and -84 or -56, 1, 0),
-            Position = UDim2.new(0, 10, 0, 0),
+        local element
+        local colorFlagEntry
+
+        -- Sol taraf: isim + renk kutusu (tüm satır tıklanabilir)
+        local clickBtn = Util.Create("TextButton", {
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundTransparency = 1,
+            Text = "",
+            AutoButtonColor = false,
+            Parent = frame,
+        })
+        Util.Padding(clickBtn, 0, 0, 0, 10)
+        Util.ListLayout(clickBtn, 8, Enum.FillDirection.Horizontal,
+            Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center)
+
+        local nameLabel = Util.Create("TextLabel", {
+            Size = UDim2.new(0, 0, 1, 0),
+            AutomaticSize = Enum.AutomaticSize.X,
             BackgroundTransparency = 1,
             Text = tName,
             TextColor3 = T.Text,
             TextSize = 12,
             Font = FONT_BODY,
             TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = frame,
+            LayoutOrder = 1,
+            Parent = clickBtn,
         })
 
-        local swBg = Util.Create("Frame", {
-            Size = UDim2.new(0, 36, 0, 18),
-            Position = UDim2.new(1, -46, 0.5, -9),
-            BackgroundColor3 = state and T.ToggleOn or T.ToggleOff,
-            BorderSizePixel = 0,
-            Parent = frame,
-        })
-        Util.Corner(swBg)
-
-        local knob = Util.Create("Frame", {
-            Size = UDim2.new(0, 14, 0, 14),
-            Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7),
-            BackgroundColor3 = Color3.new(1, 1, 1),
-            BorderSizePixel = 0,
-            Parent = swBg,
-        })
-        Util.Corner(knob)
-
-        local element
-        local colorFlagEntry
-
-        local function updateVisual()
-            if state then
-                Util.Tween(swBg, 0.2, { BackgroundColor3 = T.ToggleOn })
-                Util.Tween(knob, 0.2, { Position = UDim2.new(1, -16, 0.5, -7) })
-            else
-                Util.Tween(swBg, 0.2, { BackgroundColor3 = T.ToggleOff })
-                Util.Tween(knob, 0.2, { Position = UDim2.new(0, 2, 0.5, -7) })
-            end
-        end
-
-        local clickBtn = Util.Create("TextButton", {
-            Size = UDim2.new(1, 0, 1, 0),
-            BackgroundTransparency = 1,
-            Text = "",
-            Parent = frame,
-        })
-        clickBtn.MouseEnter:Connect(function() Util.Tween(frame, 0.15, { BackgroundColor3 = T.CardHover }) end)
-        clickBtn.MouseLeave:Connect(function() Util.Tween(frame, 0.15, { BackgroundColor3 = T.SurfaceAlt }) end)
-        clickBtn.MouseButton1Click:Connect(function()
-            state = not state
-            element.Value = state
-            updateVisual()
-            callback(state)
-        end)
-
-        -- Kare renk paleti butonu (anahtarın solunda)
+        -- Kare renk paleti butonu (ismin hemen sağında)
         local swatch
         if hasColor then
             swatch = Util.Create("TextButton", {
-                Size = UDim2.new(0, 20, 0, 20),
-                Position = UDim2.new(1, -74, 0.5, -10),
+                Size = UDim2.new(0, 18, 0, 18),
                 BackgroundColor3 = currentColor,
                 BorderSizePixel = 0,
                 Text = "",
                 AutoButtonColor = false,
-                Parent = frame,
+                LayoutOrder = 2,
+                Parent = clickBtn,
             })
             Util.Corner(swatch, UDim.new(0, 4)) -- kare
             local swStroke = Util.Stroke(swatch, Color3.new(1, 1, 1), 1, 0.55)
@@ -1422,6 +1387,52 @@ function Window:_AddSection(tabObj, options)
                 end)
             end)
         end
+
+        -- Küçültülmüş aç/kapa düğmesi (en sağda)
+        local swBg = Util.Create("TextButton", {
+            Size = UDim2.new(0, 32, 0, 16),
+            Position = UDim2.new(1, -40, 0.5, -8),
+            BackgroundColor3 = state and T.ToggleOn or T.ToggleOff,
+            BorderSizePixel = 0,
+            Text = "",
+            AutoButtonColor = false,
+            Parent = frame,
+        })
+        Util.Corner(swBg)
+
+        local knob = Util.Create("Frame", {
+            Size = UDim2.new(0, 12, 0, 12),
+            Position = state and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6),
+            BackgroundColor3 = Color3.new(1, 1, 1),
+            BorderSizePixel = 0,
+            Parent = swBg,
+        })
+        Util.Corner(knob)
+
+        local function updateVisual()
+            if state then
+                Util.Tween(swBg, 0.2, { BackgroundColor3 = T.ToggleOn })
+                Util.Tween(knob, 0.2, { Position = UDim2.new(1, -14, 0.5, -6) })
+            else
+                Util.Tween(swBg, 0.2, { BackgroundColor3 = T.ToggleOff })
+                Util.Tween(knob, 0.2, { Position = UDim2.new(0, 2, 0.5, -6) })
+            end
+        end
+
+        local function doToggle()
+            state = not state
+            element.Value = state
+            updateVisual()
+            callback(state)
+        end
+
+        clickBtn.MouseEnter:Connect(function() Util.Tween(frame, 0.15, { BackgroundColor3 = T.CardHover }) end)
+        clickBtn.MouseLeave:Connect(function() Util.Tween(frame, 0.15, { BackgroundColor3 = T.SurfaceAlt }) end)
+        clickBtn.MouseButton1Click:Connect(doToggle)
+
+        swBg.MouseEnter:Connect(function() Util.Tween(frame, 0.15, { BackgroundColor3 = T.CardHover }) end)
+        swBg.MouseLeave:Connect(function() Util.Tween(frame, 0.15, { BackgroundColor3 = T.SurfaceAlt }) end)
+        swBg.MouseButton1Click:Connect(doToggle)
 
         table.insert(PittikUI._toggles, {
             Bg = swBg,
@@ -1904,8 +1915,8 @@ function Window:_AddSection(tabObj, options)
         local flagEntry
 
         local swatch = Util.Create("TextButton", {
-            Size = UDim2.new(0, 22, 0, 22),
-            Position = UDim2.new(1, -32, 0.5, -11),
+            Size = UDim2.new(0, 20, 0, 20),
+            Position = UDim2.new(1, -30, 0.5, -10),
             BackgroundColor3 = currentColor,
             BorderSizePixel = 0,
             Text = "",
