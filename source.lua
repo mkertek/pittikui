@@ -1276,22 +1276,16 @@ function Window:_AddSection(tabObj, options)
         end
 
         local clickBtn = Util.Create("TextButton", {
-            Size = UDim2.new(1, -85, 0, 32),
+            Size = UDim2.new(1, 0, 0, 32),
+            Position = UDim2.new(0, 0, 0, 0),
             BackgroundTransparency = 1,
             Text = "",
+            ZIndex = 2,
             Parent = frame,
         })
         clickBtn.MouseEnter:Connect(function() Util.Tween(frame, 0.15, { BackgroundColor3 = T.CardHover }) end)
         clickBtn.MouseLeave:Connect(function() Util.Tween(frame, 0.15, { BackgroundColor3 = T.SurfaceAlt }) end)
         clickBtn.MouseButton1Click:Connect(toggleState)
-
-        local swBtn = Util.Create("TextButton", {
-            Size = UDim2.new(1, 0, 1, 0),
-            BackgroundTransparency = 1,
-            Text = "",
-            Parent = swBg,
-        })
-        swBtn.MouseButton1Click:Connect(toggleState)
 
         table.insert(PittikUI._toggles, {
             Bg = swBg,
@@ -1317,14 +1311,14 @@ function Window:_AddSection(tabObj, options)
                 BorderSizePixel = 0,
                 Text = "",
                 AutoButtonColor = false,
-                ZIndex = 8,
+                Active = true,
+                ZIndex = 10,
                 Parent = frame,
             })
             Util.Corner(colorBtn, UDim.new(0, 4))
             Util.Stroke(colorBtn, T.Border, 1, 0.6)
 
             titleLbl.Size = UDim2.new(1, -115, 0, 32)
-            clickBtn.Size = UDim2.new(1, -115, 0, 32)
 
             local picker = CreateColorPickerWidget(frame, colorBtn, cOpts)
             table.insert(S.Elements, picker)
