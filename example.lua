@@ -1,4 +1,4 @@
-local PittikUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/mkertek/pittikui/main/source.lua"))()
+local PittikUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/mkertek/pittikui/refs/heads/main/source.lua"))()
 
 local Window = PittikUI:CreateWindow({
     Title = "My Script Hub",
@@ -96,6 +96,10 @@ ESPSection:AddToggle({
     Default = false,
     Flag = "PlayerESP",
     Callback = function(state) print("Player ESP:", state) end,
+}):AddColorPicker({
+    Default = Color3.fromRGB(0, 255, 128),
+    Flag = "PlayerESPColor",
+    Callback = function(color) print("Player ESP Color:", color) end,
 })
 
 ESPSection:AddToggle({
@@ -103,14 +107,18 @@ ESPSection:AddToggle({
     Default = false,
     Flag = "BoxESP",
     Callback = function(state) print("Box ESP:", state) end,
+}):AddColorPicker({
+    Default = Color3.fromRGB(0, 200, 255),
+    Flag = "BoxESPColor",
+    Callback = function(color) print("Box ESP Color:", color) end,
 })
 
 ESPSection:AddDropdown({
-    Name = "ESP Color",
-    Items = {"Neon Green", "Cyan", "Red", "White", "Team Color"},
-    Default = "Neon Green",
-    Flag = "ESPColor",
-    Callback = function(selected) print("ESP Color:", selected) end,
+    Name = "ESP Mode",
+    Items = {"2D Box", "Corner Box", "3D Box"},
+    Default = "2D Box",
+    Flag = "ESPMode",
+    Callback = function(selected) print("ESP Mode:", selected) end,
 })
 
 local WorldSection = VisualsTab:AddSection({ Name = "World" })
@@ -143,98 +151,6 @@ WorldSection:AddSlider({
         workspace.CurrentCamera.FieldOfView = value
     end,
 })
-
-local SettingsTab = Window:AddTab({ Name = "Settings" })
-
-local ConfigSection = SettingsTab:AddSection({ Name = "Configuration" })
-
-local configNameBox = ConfigSection:AddTextBox({
-    Name = "Config Name",
-    Placeholder = "Enter config name...",
-})
-
-ConfigSection:AddButton({
-    Name = "Save Config",
-    Callback = function()
-        local name = configNameBox:GetText()
-        if name == "" then
-            PittikUI:Notify({ Title = "Config", Content = "Please enter a config name!", Duration = 3 })
-            return
-        end
-        local ok = Window:SaveConfig(name)
-        PittikUI:Notify({
-            Title = "Config",
-            Content = ok and ('"' .. name .. '" saved!') or "Save failed!",
-            Duration = 3,
-        })
-        if cfgDropdown and cfgDropdown.Refresh then
-            local list = Window.Config:List()
-            cfgDropdown:Refresh(#list > 0 and list or {"(empty)"})
-        end
-    end,
-})
-
-local savedList = Window.Config:List()
-cfgDropdown = ConfigSection:AddDropdown({
-    Name = "Saved Configs",
-    Items = #savedList > 0 and savedList or {"(empty)"},
-    Default = savedList[1] or "(empty)",
-})
-
-ConfigSection:AddButton({
-    Name = "Load Selected Config",
-    Callback = function()
-        local sel = cfgDropdown.Value
-        if sel == "(empty)" or sel == "" then
-            PittikUI:Notify({ Title = "Config", Content = "No config selected!", Duration = 3 })
-            return
-        end
-        Window:LoadConfig(sel)
-        PittikUI:Notify({ Title = "Config", Content = '"' .. sel .. '" loaded!', Duration = 3 })
-    end,
-})
-
-ConfigSection:AddButton({
-    Name = "Delete Selected Config",
-    Callback = function()
-        local sel = cfgDropdown.Value
-        if sel == "(empty)" or sel == "" then
-            PittikUI:Notify({ Title = "Config", Content = "No config selected!", Duration = 3 })
-            return
-        end
-        Window.Config:Delete(sel)
-        PittikUI:Notify({ Title = "Config", Content = '"' .. sel .. '" deleted!', Duration = 3 })
-        local list = Window.Config:List()
-        cfgDropdown:Refresh(#list > 0 and list or {"(empty)"})
-    end,
-})
-
-local UISection = SettingsTab:AddSection({ Name = "UI Customization" })
-
-UISection:AddColorPicker({
-    Name = "Accent Color",
-    Default = Color3.fromRGB(0, 255, 128),
-    Callback = function(color, hex)
-        PittikUI:SetAccentColor(color)
-        PittikUI:Notify({ Title = "Theme", Content = "Accent → " .. hex, Duration = 2 })
-    end,
-})
-
-local KeybindSection = SettingsTab:AddSection({ Name = "Keybinds" })
-
-KeybindSection:AddKeybind({
-    Name = "Toggle GUI Key",
-    Default = Enum.KeyCode.RightControl,
-    Callback = function(key)
-        PittikUI.ToggleKey = key
-        PittikUI:Notify({ Title = "Keybind", Content = "Toggle key → " .. key.Name, Duration = 3 })
-    end,
-})
-
-local InfoSection = SettingsTab:AddSection({ Name = "Info" })
-InfoSection:AddLabel({ Name = "Drag bottom-right corner to resize." })
-InfoSection:AddLabel({ Name = "Press toggle key to show/hide." })
-InfoSection:AddButton({ Name = "Destroy GUI", Callback = function() Window:Close() end })
 
 PittikUI:Notify({
     Title = "My Script Hub",
