@@ -42,6 +42,7 @@ local PittikUI = {
     _accentScrollBars = {},
     _toggles = {},
     _listeningForKeybind = false,
+    Transparency = 0,
 }
 
 local T = PittikUI.Theme
@@ -68,6 +69,17 @@ end
 
 function PittikUI:_TrackScrollBar(scrollFrame)
     table.insert(self._accentScrollBars, scrollFrame)
+end
+
+function PittikUI:SetTransparency(val)
+    if typeof(val) ~= "number" then return end
+    if val > 1 then val = val / 100 end
+    val = math.clamp(val, 0, 0.95)
+    self.Transparency = val
+
+    for _, win in ipairs(self.Windows) do
+        win:SetTransparency(val)
+    end
 end
 
 function PittikUI:SetAccentColor(color)
@@ -491,14 +503,16 @@ function PittikUI:CreateWindow(options)
     local titleBar = Util.Create("Frame", {
         Size = UDim2.new(1, 0, 0, 38),
         BackgroundColor3 = T.Surface,
+        BackgroundTransparency = self.Transparency,
         BorderSizePixel = 0,
         Parent = mainFrame,
     })
     Util.Corner(titleBar)
-    Util.Create("Frame", {
+    local titleBarFill = Util.Create("Frame", {
         Size = UDim2.new(1, 0, 0, 6),
         Position = UDim2.new(0, 0, 1, -6),
         BackgroundColor3 = T.Surface,
+        BackgroundTransparency = self.Transparency,
         BorderSizePixel = 0,
         Parent = titleBar,
     })
@@ -690,10 +704,13 @@ function PittikUI:CreateWindow(options)
         ScreenGui = screenGui,
         MainFrame = mainFrame,
         TitleBar = titleBar,
+        TitleBarFill = titleBarFill,
         TitleLabel = titleLabel,
+        TabBarContainer = tabBarContainer,
         TabBar = tabBar,
         ContentArea = contentArea,
         Tabs = {},
+        Sections = {},
         ActiveTab = nil,
         Minimized = false,
         Visible = true,
@@ -717,6 +734,37 @@ function PittikUI:CreateWindow(options)
 
     table.insert(PittikUI.Windows, windowObj)
     return windowObj
+end
+
+function Window:SetTransparency(val)
+    if typeof(val) ~= "number" then return end
+    if val > 1 then val = val / 100 end
+    val = math.clamp(val, 0, 0.95)
+
+    if self.MainFrame then
+        self.MainFrame.BackgroundTransparency = val
+    end
+    if self.TitleBar then
+        self.TitleBar.BackgroundTransparency = val
+    end
+    if self.TitleBarFill then
+        self.TitleBarFill.BackgroundTransparency = val
+    end
+    if self.TabBarContainer then
+        self.TabBarContainer.BackgroundTransparency = math.clamp(0.3 + val * 0.7, 0, 1)
+    end
+
+    for _, sec in ipairs(self.Sections or {}) do
+        if sec.Frame then
+            sec.Frame.BackgroundTransparency = math.clamp(val * 0.85, 0, 0.95)
+        end
+        if sec.Header then
+            sec.Header.BackgroundTransparency = math.clamp(0.3 + val * 0.7, 0, 1)
+        end
+        if sec.HeaderFill then
+            sec.HeaderFill.BackgroundTransparency = math.clamp(0.3 + val * 0.7, 0, 1)
+        end
+    end
 end
 
 function Window:SetTitle(newTitle)
@@ -864,6 +912,7 @@ function Window:_AddSection(tabObj, options)
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundColor3 = T.Card,
+        BackgroundTransparency = math.clamp(PittikUI.Transparency * 0.85, 0, 0.95),
         BorderSizePixel = 0,
         LayoutOrder = #tabObj.Sections + 1,
         Parent = tabObj.Page,
@@ -874,18 +923,24 @@ function Window:_AddSection(tabObj, options)
     local headerFrame = Util.Create("Frame", {
         Size = UDim2.new(1, 0, 0, 28),
         BackgroundColor3 = T.SurfaceAlt,
-        BackgroundTransparency = 0.3,
+        BackgroundTransparency = math.clamp(0.3 + PittikUI.Transparency * 0.7, 0, 1),
         BorderSizePixel = 0,
         Parent = sectionFrame,
     })
     Util.Corner(headerFrame)
-    Util.Create("Frame", {
+    local headerFill = Util.Create("Frame", {
         Size = UDim2.new(1, 0, 0, 6),
         Position = UDim2.new(0, 0, 1, -6),
         BackgroundColor3 = T.SurfaceAlt,
-        BackgroundTransparency = 0.3,
+        BackgroundTransparency = math.clamp(0.3 + PittikUI.Transparency * 0.7, 0, 1),
         BorderSizePixel = 0,
         Parent = headerFrame,
+    })
+
+    table.insert(self.Sections, {
+        Frame = sectionFrame,
+        Header = headerFrame,
+        HeaderFill = headerFill,
     })
 
     local hAccent = Util.Create("Frame", {
