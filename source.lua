@@ -1,3 +1,4 @@
+
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -1010,6 +1011,147 @@ function Window:_AddSection(tabObj, options)
         table.insert(self.Elements, { Instance = btnFrame, Type = "Button" })
     end
 
+    local function CreateColorPickerWidget(parentFrame, colorBtn, opts)
+        opts = opts or {}
+        local callback = opts.Callback or function() end
+        local hue, sat, val = 0.33, 1, 1
+        if opts.Default then hue, sat, val = Color3.toHSV(opts.Default) end
+
+        local isOpen = false
+
+        local pickerContainer = Util.Create("Frame", {
+            Size = UDim2.new(1, -16, 0, 102),
+            Position = UDim2.new(0, 8, 0, 34),
+            BackgroundTransparency = 1,
+            ClipsDescendants = true,
+            Visible = false,
+            Parent = parentFrame,
+        })
+
+        local svField = Util.Create("Frame", {
+            Size = UDim2.new(1, -55, 0, 76),
+            Position = UDim2.new(0, 0, 0, 0),
+            BackgroundColor3 = Color3.fromHSV(hue, 1, 1),
+            BorderSizePixel = 0,
+            ClipsDescendants = true,
+            Parent = pickerContainer,
+        })
+        Util.Corner(svField)
+
+        local whiteOv = Util.Create("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, Parent = svField })
+        Util.Create("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,0), NumberSequenceKeypoint.new(1,1) }), Parent = whiteOv })
+        local blackOv = Util.Create("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.new(0,0,0), BorderSizePixel = 0, Parent = svField })
+        Util.Create("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,1), NumberSequenceKeypoint.new(1,0) }), Rotation = 90, Parent = blackOv })
+
+        local svCursor = Util.Create("Frame", { Size = UDim2.new(0,10,0,10), Position = UDim2.new(sat,-5,1-val,-5), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 5, Parent = svField })
+        Util.Stroke(svCursor, Color3.new(1,1,1), 2, 0)
+
+        local svBtn = Util.Create("TextButton", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Text = "", ZIndex = 6, Parent = svField })
+
+        local hueBar = Util.Create("Frame", { Size = UDim2.new(1,-55,0,14), Position = UDim2.new(0,0,0,84), BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, ClipsDescendants = true, Parent = pickerContainer })
+        Util.Corner(hueBar)
+        Util.Create("UIGradient", {
+            Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)),
+                ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255,255,0)),
+                ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0,255,0)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,255,255)),
+                ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0,0,255)),
+                ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255,0,255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0)),
+            }),
+            Parent = hueBar,
+        })
+
+        local hueCursor = Util.Create("Frame", { Size = UDim2.new(0,4,1,4), Position = UDim2.new(hue,-2,0,-2), BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, ZIndex = 5, Parent = hueBar })
+        Util.Corner(hueCursor)
+        local hueBtn = Util.Create("TextButton", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Text = "", ZIndex = 6, Parent = hueBar })
+
+        local preview = Util.Create("Frame", { Size = UDim2.new(0,42,0,42), Position = UDim2.new(1,-44,0,0), BackgroundColor3 = Color3.fromHSV(hue,sat,val), BorderSizePixel = 0, Parent = pickerContainer })
+        Util.Corner(preview)
+        Util.Stroke(preview, Color3.new(1,1,1), 1, 0.5)
+
+        local function toHex(c) return string.format("#%02X%02X%02X", math.floor(c.R*255+.5), math.floor(c.G*255+.5), math.floor(c.B*255+.5)) end
+
+        local hexLbl = Util.Create("TextLabel", { Size = UDim2.new(0,44,0,18), Position = UDim2.new(1,-45,0,48), BackgroundTransparency = 1, Text = toHex(Color3.fromHSV(hue,sat,val)), TextColor3 = T.TextDim, TextSize = 9, Font = FONT_SMALL, Parent = pickerContainer })
+
+        local element
+
+        local function updateColor(notify)
+            local c = Color3.fromHSV(hue, sat, val)
+            svField.BackgroundColor3 = Color3.fromHSV(hue, 1, 1)
+            svCursor.Position = UDim2.new(sat, -5, 1-val, -5)
+            hueCursor.Position = UDim2.new(hue, -2, 0, -2)
+            preview.BackgroundColor3 = c
+            colorBtn.BackgroundColor3 = c
+            hexLbl.Text = toHex(c)
+            if element then element.Value = c end
+            if notify ~= false then
+                callback(c, toHex(c))
+            end
+        end
+
+        local svDrag, hueDrag = false, false
+        svBtn.MouseButton1Down:Connect(function()
+            svDrag = true
+            local p, s = svField.AbsolutePosition, svField.AbsoluteSize
+            sat = math.clamp((Mouse.X-p.X)/s.X, 0, 1)
+            val = math.clamp(1-(Mouse.Y-p.Y)/s.Y, 0, 1)
+            updateColor(true)
+        end)
+        hueBtn.MouseButton1Down:Connect(function()
+            hueDrag = true
+            hue = math.clamp((Mouse.X-hueBar.AbsolutePosition.X)/hueBar.AbsoluteSize.X, 0, 0.999)
+            updateColor(true)
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                if svDrag then
+                    local p, s = svField.AbsolutePosition, svField.AbsoluteSize
+                    sat = math.clamp((input.Position.X-p.X)/s.X, 0, 1)
+                    val = math.clamp(1-(input.Position.Y-p.Y)/s.Y, 0, 1)
+                    updateColor(true)
+                elseif hueDrag then
+                    hue = math.clamp((input.Position.X-hueBar.AbsolutePosition.X)/hueBar.AbsoluteSize.X, 0, 0.999)
+                    updateColor(true)
+                end
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then svDrag = false; hueDrag = false end
+        end)
+
+        colorBtn.MouseButton1Click:Connect(function()
+            isOpen = not isOpen
+            if isOpen then
+                pickerContainer.Visible = true
+                Util.Tween(parentFrame, 0.2, { Size = UDim2.new(1, 0, 0, 142) })
+            else
+                Util.Tween(parentFrame, 0.2, { Size = UDim2.new(1, 0, 0, 32) })
+                task.delay(0.2, function()
+                    if not isOpen then pickerContainer.Visible = false end
+                end)
+            end
+        end)
+
+        element = {
+            Instance = parentFrame,
+            Type = "ColorPicker",
+            Value = Color3.fromHSV(hue, sat, val),
+        }
+        function element:Set(newColor)
+            hue, sat, val = Color3.toHSV(newColor)
+            updateColor(true)
+        end
+
+        if opts.Flag then
+            element.Flag = opts.Flag
+            PittikUI.Flags[opts.Flag] = element
+        end
+
+        return element
+    end
+
     function S:AddToggle(opts)
         opts = opts or {}
         local tName = opts.Name or "Toggle"
@@ -1022,14 +1164,15 @@ function Window:_AddSection(tabObj, options)
             Size = UDim2.new(1, 0, 0, 32),
             BackgroundColor3 = T.SurfaceAlt,
             BorderSizePixel = 0,
+            ClipsDescendants = true,
             LayoutOrder = #self.Elements + 1,
             Parent = self.Content,
         })
         Util.Corner(frame)
         Util.Stroke(frame, T.Border, 1, 0.7)
 
-        Util.Create("TextLabel", {
-            Size = UDim2.new(1, -56, 1, 0),
+        local titleLbl = Util.Create("TextLabel", {
+            Size = UDim2.new(1, -85, 0, 32),
             Position = UDim2.new(0, 10, 0, 0),
             BackgroundTransparency = 1,
             Text = tName,
@@ -1042,7 +1185,7 @@ function Window:_AddSection(tabObj, options)
 
         local swBg = Util.Create("Frame", {
             Size = UDim2.new(0, 36, 0, 18),
-            Position = UDim2.new(1, -46, 0.5, -9),
+            Position = UDim2.new(1, -46, 0, 7),
             BackgroundColor3 = state and T.ToggleOn or T.ToggleOff,
             BorderSizePixel = 0,
             Parent = frame,
@@ -1070,20 +1213,30 @@ function Window:_AddSection(tabObj, options)
             end
         end
 
+        local function toggleState()
+            state = not state
+            element.Value = state
+            updateVisual()
+            callback(state)
+        end
+
         local clickBtn = Util.Create("TextButton", {
-            Size = UDim2.new(1, 0, 1, 0),
+            Size = UDim2.new(1, -85, 0, 32),
             BackgroundTransparency = 1,
             Text = "",
             Parent = frame,
         })
         clickBtn.MouseEnter:Connect(function() Util.Tween(frame, 0.15, { BackgroundColor3 = T.CardHover }) end)
         clickBtn.MouseLeave:Connect(function() Util.Tween(frame, 0.15, { BackgroundColor3 = T.SurfaceAlt }) end)
-        clickBtn.MouseButton1Click:Connect(function()
-            state = not state
-            element.Value = state
-            updateVisual()
-            callback(state)
-        end)
+        clickBtn.MouseButton1Click:Connect(toggleState)
+
+        local swBtn = Util.Create("TextButton", {
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundTransparency = 1,
+            Text = "",
+            Parent = swBg,
+        })
+        swBtn.MouseButton1Click:Connect(toggleState)
 
         table.insert(PittikUI._toggles, {
             Bg = swBg,
@@ -1098,6 +1251,40 @@ function Window:_AddSection(tabObj, options)
             callback(state)
         end
         if flag then element.Flag = flag; PittikUI.Flags[flag] = element end
+
+        function element:AddColorPicker(cOpts)
+            cOpts = cOpts or {}
+            local initColor = cOpts.Default or Color3.fromRGB(0, 255, 128)
+            local colorBtn = Util.Create("TextButton", {
+                Size = UDim2.new(0, 24, 0, 18),
+                Position = UDim2.new(1, -76, 0, 7),
+                BackgroundColor3 = initColor,
+                BorderSizePixel = 0,
+                Text = "",
+                AutoButtonColor = false,
+                ZIndex = 8,
+                Parent = frame,
+            })
+            Util.Corner(colorBtn, UDim.new(0, 4))
+            Util.Stroke(colorBtn, T.Border, 1, 0.6)
+
+            titleLbl.Size = UDim2.new(1, -115, 0, 32)
+            clickBtn.Size = UDim2.new(1, -115, 0, 32)
+
+            local picker = CreateColorPickerWidget(frame, colorBtn, cOpts)
+            table.insert(S.Elements, picker)
+            element.ColorPicker = picker
+            return picker
+        end
+
+        if opts.Color or opts.ColorCallback or opts.ColorFlag then
+            element:AddColorPicker({
+                Default = opts.Color,
+                Flag = opts.ColorFlag,
+                Callback = opts.ColorCallback,
+            })
+        end
+
         table.insert(self.Elements, element)
         return element
     end
@@ -1521,14 +1708,13 @@ function Window:_AddSection(tabObj, options)
     function S:AddColorPicker(opts)
         opts = opts or {}
         local cpName = opts.Name or "Color"
-        local callback = opts.Callback or function() end
-        local hue, sat, val = 0.33, 1, 1
-        if opts.Default then hue, sat, val = Color3.toHSV(opts.Default) end
+        local initColor = opts.Default or Color3.fromRGB(0, 255, 128)
 
         local cpFrame = Util.Create("Frame", {
-            Size = UDim2.new(1, 0, 0, 140),
+            Size = UDim2.new(1, 0, 0, 32),
             BackgroundColor3 = T.SurfaceAlt,
             BorderSizePixel = 0,
+            ClipsDescendants = true,
             LayoutOrder = #self.Elements + 1,
             Parent = self.Content,
         })
@@ -1536,8 +1722,8 @@ function Window:_AddSection(tabObj, options)
         Util.Stroke(cpFrame, T.Border, 1, 0.7)
 
         Util.Create("TextLabel", {
-            Size = UDim2.new(1, -10, 0, 22),
-            Position = UDim2.new(0, 10, 0, 2),
+            Size = UDim2.new(1, -50, 0, 32),
+            Position = UDim2.new(0, 10, 0, 0),
             BackgroundTransparency = 1,
             Text = cpName,
             TextColor3 = T.Text,
@@ -1547,107 +1733,25 @@ function Window:_AddSection(tabObj, options)
             Parent = cpFrame,
         })
 
-        local svField = Util.Create("Frame", {
-            Size = UDim2.new(1, -60, 0, 80),
-            Position = UDim2.new(0, 8, 0, 26),
-            BackgroundColor3 = Color3.fromHSV(hue, 1, 1),
+        local colorBtn = Util.Create("TextButton", {
+            Size = UDim2.new(0, 26, 0, 18),
+            Position = UDim2.new(1, -36, 0, 7),
+            BackgroundColor3 = initColor,
             BorderSizePixel = 0,
-            ClipsDescendants = true,
+            Text = "",
+            AutoButtonColor = false,
+            ZIndex = 8,
             Parent = cpFrame,
         })
-        Util.Corner(svField)
+        Util.Corner(colorBtn, UDim.new(0, 4))
+        Util.Stroke(colorBtn, T.Border, 1, 0.6)
 
-        local whiteOv = Util.Create("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, Parent = svField })
-        Util.Create("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,0), NumberSequenceKeypoint.new(1,1) }), Parent = whiteOv })
-        local blackOv = Util.Create("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.new(0,0,0), BorderSizePixel = 0, Parent = svField })
-        Util.Create("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,1), NumberSequenceKeypoint.new(1,0) }), Rotation = 90, Parent = blackOv })
+        cpFrame.MouseEnter:Connect(function() Util.Tween(cpFrame, 0.15, { BackgroundColor3 = T.CardHover }) end)
+        cpFrame.MouseLeave:Connect(function() Util.Tween(cpFrame, 0.15, { BackgroundColor3 = T.SurfaceAlt }) end)
 
-        local svCursor = Util.Create("Frame", { Size = UDim2.new(0,10,0,10), Position = UDim2.new(sat,-5,1-val,-5), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 5, Parent = svField })
-        Util.Stroke(svCursor, Color3.new(1,1,1), 2, 0)
-
-        local svBtn = Util.Create("TextButton", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Text = "", ZIndex = 6, Parent = svField })
-
-        local hueBar = Util.Create("Frame", { Size = UDim2.new(1,-60,0,14), Position = UDim2.new(0,8,0,112), BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, ClipsDescendants = true, Parent = cpFrame })
-        Util.Corner(hueBar)
-        Util.Create("UIGradient", {
-            Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)),
-                ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255,255,0)),
-                ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0,255,0)),
-                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,255,255)),
-                ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0,0,255)),
-                ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255,0,255)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0)),
-            }),
-            Parent = hueBar,
-        })
-
-        local hueCursor = Util.Create("Frame", { Size = UDim2.new(0,4,1,4), Position = UDim2.new(hue,-2,0,-2), BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, ZIndex = 5, Parent = hueBar })
-        Util.Corner(hueCursor)
-        local hueBtn = Util.Create("TextButton", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Text = "", ZIndex = 6, Parent = hueBar })
-
-        local preview = Util.Create("Frame", { Size = UDim2.new(0,36,0,36), Position = UDim2.new(1,-46,0,26), BackgroundColor3 = Color3.fromHSV(hue,sat,val), BorderSizePixel = 0, Parent = cpFrame })
-        Util.Corner(preview)
-        Util.Stroke(preview, Color3.new(1,1,1), 1, 0.5)
-
-        local function toHex(c) return string.format("#%02X%02X%02X", math.floor(c.R*255+.5), math.floor(c.G*255+.5), math.floor(c.B*255+.5)) end
-
-        local hexLbl = Util.Create("TextLabel", { Size = UDim2.new(0,36,0,14), Position = UDim2.new(1,-46,0,64), BackgroundTransparency = 1, Text = toHex(Color3.fromHSV(hue,sat,val)), TextColor3 = T.TextDim, TextSize = 9, Font = FONT_SMALL, Parent = cpFrame })
-
-        local applyBtn = Util.Create("TextButton", { Size = UDim2.new(0,36,0,22), Position = UDim2.new(1,-46,0,104), BackgroundColor3 = T.Background, BorderSizePixel = 0, Text = "Apply", TextColor3 = T.TextAccent, TextSize = 10, Font = FONT_MAIN, AutoButtonColor = false, Parent = cpFrame })
-        Util.Corner(applyBtn)
-        Util.Stroke(applyBtn, T.Accent, 1, 0.5)
-        PittikUI:_TrackText(applyBtn)
-
-        applyBtn.MouseEnter:Connect(function() Util.Tween(applyBtn, 0.15, { BackgroundColor3 = T.CardHover }) end)
-        applyBtn.MouseLeave:Connect(function() Util.Tween(applyBtn, 0.15, { BackgroundColor3 = T.Background }) end)
-
-        local function updateColor()
-            local c = Color3.fromHSV(hue, sat, val)
-            svField.BackgroundColor3 = Color3.fromHSV(hue, 1, 1)
-            svCursor.Position = UDim2.new(sat, -5, 1-val, -5)
-            hueCursor.Position = UDim2.new(hue, -2, 0, -2)
-            preview.BackgroundColor3 = c
-            hexLbl.Text = toHex(c)
-        end
-
-        local svDrag, hueDrag = false, false
-        svBtn.MouseButton1Down:Connect(function()
-            svDrag = true
-            local p, s = svField.AbsolutePosition, svField.AbsoluteSize
-            sat = math.clamp((Mouse.X-p.X)/s.X, 0, 1)
-            val = math.clamp(1-(Mouse.Y-p.Y)/s.Y, 0, 1)
-            updateColor()
-        end)
-        hueBtn.MouseButton1Down:Connect(function()
-            hueDrag = true
-            hue = math.clamp((Mouse.X-hueBar.AbsolutePosition.X)/hueBar.AbsoluteSize.X, 0, 0.999)
-            updateColor()
-        end)
-        UserInputService.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement then
-                if svDrag then
-                    local p, s = svField.AbsolutePosition, svField.AbsoluteSize
-                    sat = math.clamp((input.Position.X-p.X)/s.X, 0, 1)
-                    val = math.clamp(1-(input.Position.Y-p.Y)/s.Y, 0, 1)
-                    updateColor()
-                elseif hueDrag then
-                    hue = math.clamp((input.Position.X-hueBar.AbsolutePosition.X)/hueBar.AbsoluteSize.X, 0, 0.999)
-                    updateColor()
-                end
-            end
-        end)
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then svDrag = false; hueDrag = false end
-        end)
-
-        applyBtn.MouseButton1Click:Connect(function()
-            local c = Color3.fromHSV(hue, sat, val)
-            Util.Ripple(applyBtn, c)
-            callback(c, toHex(c))
-        end)
-
-        table.insert(self.Elements, { Instance = cpFrame, Type = "ColorPicker" })
+        local picker = CreateColorPickerWidget(cpFrame, colorBtn, opts)
+        table.insert(self.Elements, picker)
+        return picker
     end
 
     table.insert(tabObj.Sections, S)
