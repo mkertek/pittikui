@@ -517,28 +517,27 @@ function PittikUI:ResolveAsset(icon)
     local getAsset = getcustomasset or getsynasset
 
     if not icon or icon == "" or icon == "default" then
-        if getAsset and writefile and isfile then
+        if getAsset and writefile then
             local filename = "pittik_logo_v1.png"
-            if not isfile(filename) then
+            local hasFile = false
+            if isfile then
+                local s, r = pcall(isfile, filename)
+                hasFile = s and r
+            end
+            if not hasFile then
                 local raw = Base64Decode(DEFAULT_LOGO_B64)
                 if raw and #raw > 0 then
                     pcall(writefile, filename, raw)
                 end
             end
-            if isfile(filename) then
-                local ok, asset = pcall(getAsset, filename)
-                if ok and asset then return asset end
-            end
-        end
-        if getAsset and writefile and isfile then
-            local filename = "pittik_logo_v1.png"
-            if not isfile(filename) then
-                local ok, body = pcall(game.HttpGet, game, "https://raw.githubusercontent.com/mkertek/pittikui/refs/heads/main/logo_white_transparent.png")
-                if ok and body and #body > 0 then
-                    pcall(writefile, filename, body)
-                    local aOk, asset = pcall(getAsset, filename)
-                    if aOk and asset then return asset end
-                end
+            local ok, asset = pcall(getAsset, filename)
+            if ok and asset then return asset end
+
+            local gOk, body = pcall(game.HttpGet, game, "https://raw.githubusercontent.com/mkertek/pittikui/refs/heads/main/logo_white_transparent.png")
+            if gOk and body and #body > 0 then
+                pcall(writefile, filename, body)
+                local aOk, asset2 = pcall(getAsset, filename)
+                if aOk and asset2 then return asset2 end
             end
         end
         return nil
