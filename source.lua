@@ -488,7 +488,13 @@ function PittikUI:CreateWindow(options)
 
     EnsureNotifContainer()
 
-    local mainFrame = Util.Create("Frame", {
+    local isCanvasGroupSupported = pcall(function()
+        local test = Instance.new("CanvasGroup")
+        test:Destroy()
+    end)
+    local frameClass = isCanvasGroupSupported and "CanvasGroup" or "Frame"
+
+    local mainFrameProps = {
         Name = "MainFrame",
         Size = size,
         Position = UDim2.new(0.5, -(size.X.Offset / 2), 0.5, -(size.Y.Offset / 2)),
@@ -496,7 +502,12 @@ function PittikUI:CreateWindow(options)
         BorderSizePixel = 0,
         ClipsDescendants = true,
         Parent = screenGui,
-    })
+    }
+    if isCanvasGroupSupported then
+        mainFrameProps.GroupTransparency = self.Transparency
+    end
+
+    local mainFrame = Util.Create(frameClass, mainFrameProps)
     Util.Corner(mainFrame)
     Util.Stroke(mainFrame, T.Accent, 1.5, 0.2)
 
@@ -733,6 +744,9 @@ function PittikUI:CreateWindow(options)
     end)
 
     table.insert(PittikUI.Windows, windowObj)
+    task.defer(function()
+        pcall(function() windowObj:_CreateDefaultSettings() end)
+    end)
     return windowObj
 end
 
@@ -741,30 +755,147 @@ function Window:SetTransparency(val)
     if val > 1 then val = val / 100 end
     val = math.clamp(val, 0, 0.95)
 
-    if self.MainFrame then
-        self.MainFrame.BackgroundTransparency = val
+    if self.MainFrame and self.MainFrame:IsA("CanvasGroup") then
+        self.MainFrame.GroupTransparency = val
+    else
+        if self.MainFrame then
+            self.MainFrame.BackgroundTransparency = val
+        end
+        if self.TitleBar then
+            self.TitleBar.BackgroundTransparency = val
+        end
+        if self.TitleBarFill then
+            self.TitleBarFill.BackgroundTransparency = val
+        end
+        if self.TabBarContainer then
+            self.TabBarContainer.BackgroundTransparency = math.clamp(0.3 + val * 0.7, 0, 1)
+        end
+        for _, sec in ipairs(self.Sections or {}) do
+            if sec.Frame then
+                sec.Frame.BackgroundTransparency = math.clamp(val * 0.85, 0, 0.95)
+            end
+            if sec.Header then
+                sec.Header.BackgroundTransparency = math.clamp(0.3 + val * 0.7, 0, 1)
+            end
+            if sec.HeaderFill then
+                sec.HeaderFill.BackgroundTransparency = math.clamp(0.3 + val * 0.7, 0, 1)
+            end
+        end
     end
-    if self.TitleBar then
-        self.TitleBar.BackgroundTransparency = val
-    end
-    if self.TitleBarFill then
-        self.TitleBarFill.BackgroundTransparency = val
-    end
-    if self.TabBarContainer then
-        self.TabBarContainer.BackgroundTransparency = math.clamp(0.3 + val * 0.7, 0, 1)
+end
+
+function Window:_CreateDefaultSettings()
+    if self._hasSettingsTab then return end
+    self._hasSettingsTab = true
+
+    local SettingsTab = self:AddTab({ Name = "Settings" })
+    SettingsTab.Button.LayoutOrder = 9999
+
+    if #self.Tabs > 1 and self.Tabs[1] ~= SettingsTab then
+        self:_SelectTab(self.Tabs[1])
     end
 
-    for _, sec in ipairs(self.Sections or {}) do
-        if sec.Frame then
-            sec.Frame.BackgroundTransparency = math.clamp(val * 0.85, 0, 0.95)
-        end
-        if sec.Header then
-            sec.Header.BackgroundTransparency = math.clamp(0.3 + val * 0.7, 0, 1)
-        end
-        if sec.HeaderFill then
-            sec.HeaderFill.BackgroundTransparency = math.clamp(0.3 + val * 0.7, 0, 1)
-        end
-    end
+    local ConfigSection = SettingsTab:AddSection({ Name = "Configuration" })
+    local configNameBox = ConfigSection:AddTextBox({
+        Name = "Config Name",
+        Placeholder = "Enter config name...",
+    })
+
+    local cfgDropdown
+
+    ConfigSection:AddButton({
+        Name = "Save Config",
+        Callback = function()
+            local name = configNameBox:GetText()
+            if name == "" then
+                PittikUI:Notify({ Title = "Config", Content = "Please enter a config name!", Duration = 3 })
+                return
+            end
+            local ok = self:SaveConfig(name)
+            PittikUI:Notify({
+                Title = "Config",
+                Content = ok and ('"' .. name .. '" saved!') or "Save failed!",
+                Duration = 3,
+            })
+            if cfgDropdown and cfgDropdown.Refresh then
+                local list = self.Config:List()
+                cfgDropdown:Refresh(#list > 0 and list or {"(empty)"})
+            end
+        end,
+    })
+
+    local savedList = self.Config:List()
+    cfgDropdown = ConfigSection:AddDropdown({
+        Name = "Saved Configs",
+        Items = #savedList > 0 and savedList or {"(empty)"},
+        Default = savedList[1] or "(empty)",
+    })
+
+    ConfigSection:AddButton({
+        Name = "Load Selected Config",
+        Callback = function()
+            local sel = cfgDropdown.Value
+            if sel == "(empty)" or sel == "" then
+                PittikUI:Notify({ Title = "Config", Content = "No config selected!", Duration = 3 })
+                return
+            end
+            self:LoadConfig(sel)
+            PittikUI:Notify({ Title = "Config", Content = '"' .. sel .. '" loaded!', Duration = 3 })
+        end,
+    })
+
+    ConfigSection:AddButton({
+        Name = "Delete Selected Config",
+        Callback = function()
+            local sel = cfgDropdown.Value
+            if sel == "(empty)" or sel == "" then
+                PittikUI:Notify({ Title = "Config", Content = "No config selected!", Duration = 3 })
+                return
+            end
+            self.Config:Delete(sel)
+            PittikUI:Notify({ Title = "Config", Content = '"' .. sel .. '" deleted!', Duration = 3 })
+            local list = self.Config:List()
+            cfgDropdown:Refresh(#list > 0 and list or {"(empty)"})
+        end,
+    })
+
+    local ThemeSec = SettingsTab:AddSection({ Name = "UI Customization" })
+
+    ThemeSec:AddColorPicker({
+        Name = "Accent Color",
+        Default = T.Accent,
+        Callback = function(color)
+            PittikUI:SetAccentColor(color)
+        end,
+    })
+
+    ThemeSec:AddSlider({
+        Name = "Menu Transparency",
+        Min = 0,
+        Max = 90,
+        Default = math.floor(PittikUI.Transparency * 100),
+        Increment = 5,
+        Suffix = "%",
+        Flag = "MenuTransparency",
+        Callback = function(val)
+            PittikUI:SetTransparency(val / 100)
+        end,
+    })
+
+    ThemeSec:AddKeybind({
+        Name = "Toggle GUI Key",
+        Default = PittikUI.ToggleKey,
+        Callback = function(key)
+            PittikUI.ToggleKey = key
+        end,
+    })
+
+    ThemeSec:AddButton({
+        Name = "Destroy GUI",
+        Callback = function()
+            self:Close()
+        end,
+    })
 end
 
 function Window:SetTitle(newTitle)
@@ -852,7 +983,11 @@ function Window:AddTab(options)
     end)
 
     table.insert(self.Tabs, tabObj)
-    if #self.Tabs == 1 then self:_SelectTab(tabObj) end
+    if name ~= "Settings" and (not self.ActiveTab or self.ActiveTab.Name == "Settings") then
+        self:_SelectTab(tabObj)
+    elseif #self.Tabs == 1 then
+        self:_SelectTab(tabObj)
+    end
 
     setmetatable(tabObj, { __index = {
         AddSection = function(_, sOpts) return self:_AddSection(tabObj, sOpts) end
