@@ -1823,11 +1823,33 @@ function Window:_AddSection(tabObj, options)
         opts = opts or {}
         local dName = opts.Name or "Dropdown"
         local items = opts.Items or {}
-        local default = opts.Default or (items[1] or "")
+        local isMulti = opts.Multi == true
         local flag = opts.Flag or nil
         local callback = opts.Callback or function() end
-        local selected = default
         local isOpen = false
+
+        local selected = isMulti and {} or (opts.Default or (items[1] or ""))
+        if isMulti then
+            if type(opts.Default) == "table" then
+                for _, v in ipairs(opts.Default) do selected[v] = true end
+                for k, v in pairs(opts.Default) do if v == true then selected[k] = true end end
+            end
+        end
+
+        local function getSelectedText()
+            if not isMulti then return tostring(selected) end
+            local count = 0
+            local first = nil
+            for _, item in ipairs(items) do
+                if selected[item] then
+                    count = count + 1
+                    if not first then first = item end
+                end
+            end
+            if count == 0 then return "None" end
+            if count == 1 then return tostring(first) end
+            return count .. " items"
+        end
 
         local dFrame = Util.Create("Frame", {
             Size = UDim2.new(1, 0, 0, 32),
@@ -1860,7 +1882,7 @@ function Window:_AddSection(tabObj, options)
             Size = UDim2.new(0.5, -30, 1, 0),
             Position = UDim2.new(0.5, 0, 0, 0),
             BackgroundTransparency = 1,
-            Text = tostring(selected),
+            Text = getSelectedText(),
             TextColor3 = T.TextAccent,
             TextSize = 12,
             Font = FONT_MAIN,
@@ -1881,12 +1903,16 @@ function Window:_AddSection(tabObj, options)
         })
         PittikUI:_TrackAccentDimText(arrowLbl)
 
-        local optContainer = Util.Create("Frame", {
+        local optContainer = Util.Create("ScrollingFrame", {
             Size = UDim2.new(1, 0, 0, 0),
             Position = UDim2.new(0, 0, 0, 34),
             BackgroundColor3 = T.DropdownBg,
             BorderSizePixel = 0,
             ClipsDescendants = true,
+            ScrollBarThickness = 3,
+            ScrollBarImageColor3 = T.Accent,
+            CanvasSize = UDim2.new(0, 0, 0, 0),
+            AutomaticCanvasSize = Enum.AutomaticSize.Y,
             ZIndex = 10,
             Visible = false,
             Parent = dFrame,
@@ -1898,17 +1924,26 @@ function Window:_AddSection(tabObj, options)
         local optBtns = {}
         local element
 
+        local function isItemSelected(item)
+            if isMulti then
+                return selected[item] == true
+            else
+                return tostring(item) == tostring(selected)
+            end
+        end
+
         local function buildOptions()
             for _, b in ipairs(optBtns) do b:Destroy() end
             optBtns = {}
             for i, item in ipairs(items) do
+                local isSel = isItemSelected(item)
                 local ob = Util.Create("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 26),
-                    BackgroundColor3 = T.SurfaceAlt,
-                    BackgroundTransparency = (tostring(item) == tostring(selected)) and 0 or 0.5,
+                    Size = UDim2.new(1, -4, 0, 26),
+                    BackgroundColor3 = isSel and T.CardHover or T.SurfaceAlt,
+                    BackgroundTransparency = isSel and 0 or 0.5,
                     BorderSizePixel = 0,
-                    Text = tostring(item),
-                    TextColor3 = (tostring(item) == tostring(selected)) and T.TextAccent or T.Text,
+                    Text = (isMulti and (isSel and "[✓] " or "[  ] ") or "") .. tostring(item),
+                    TextColor3 = isSel and T.TextAccent or T.Text,
                     TextSize = 11,
                     Font = FONT_BODY,
                     AutoButtonColor = false,
@@ -1919,18 +1954,26 @@ function Window:_AddSection(tabObj, options)
                 Util.Corner(ob)
                 ob.MouseEnter:Connect(function() Util.Tween(ob, 0.1, { BackgroundTransparency = 0, BackgroundColor3 = T.CardHover }) end)
                 ob.MouseLeave:Connect(function()
-                    local isSel = tostring(item) == tostring(selected)
-                    Util.Tween(ob, 0.1, { BackgroundTransparency = isSel and 0 or 0.5, BackgroundColor3 = T.SurfaceAlt })
+                    local nowSel = isItemSelected(item)
+                    Util.Tween(ob, 0.1, { BackgroundTransparency = nowSel and 0 or 0.5, BackgroundColor3 = nowSel and T.CardHover or T.SurfaceAlt })
                 end)
                 ob.MouseButton1Click:Connect(function()
-                    selected = item; element.Value = selected
-                    selLabel.Text = tostring(item)
-                    callback(item)
-                    isOpen = false; arrowLbl.Text = "▼"
-                    Util.Tween(optContainer, 0.2, { Size = UDim2.new(1, 0, 0, 0) })
-                    Util.Tween(dFrame, 0.2, { Size = UDim2.new(1, 0, 0, 32) })
-                    task.delay(0.2, function() optContainer.Visible = false end)
-                    task.defer(buildOptions)
+                    if isMulti then
+                        selected[item] = not selected[item]
+                        element.Value = selected
+                        selLabel.Text = getSelectedText()
+                        callback(selected)
+                        buildOptions()
+                    else
+                        selected = item; element.Value = selected
+                        selLabel.Text = tostring(item)
+                        callback(item)
+                        isOpen = false; arrowLbl.Text = "▼"
+                        Util.Tween(optContainer, 0.2, { Size = UDim2.new(1, 0, 0, 0) })
+                        Util.Tween(dFrame, 0.2, { Size = UDim2.new(1, 0, 0, 32) })
+                        task.delay(0.2, function() optContainer.Visible = false end)
+                        task.defer(buildOptions)
+                    end
                 end)
                 table.insert(optBtns, ob)
             end
@@ -1950,7 +1993,7 @@ function Window:_AddSection(tabObj, options)
             isOpen = not isOpen
             if isOpen then
                 arrowLbl.Text = "▲"; optContainer.Visible = true
-                local th = #items * 28 + 6
+                local th = math.clamp(#items * 28 + 6, 30, 210)
                 Util.Tween(optContainer, 0.2, { Size = UDim2.new(1, 0, 0, th) })
                 Util.Tween(dFrame, 0.2, { Size = UDim2.new(1, 0, 0, 32 + th + 4) })
             else
@@ -1963,17 +2006,37 @@ function Window:_AddSection(tabObj, options)
 
         element = { Instance = dFrame, Type = "Dropdown", Value = selected }
         function element:Set(val)
-            selected = val; element.Value = val
-            selLabel.Text = tostring(val); callback(val)
+            if isMulti then
+                selected = {}
+                if type(val) == "table" then
+                    for _, v in ipairs(val) do selected[v] = true end
+                    for k, v in pairs(val) do if v == true then selected[k] = true end end
+                end
+            else
+                selected = val
+            end
+            element.Value = selected
+            selLabel.Text = getSelectedText()
+            callback(selected)
             task.defer(buildOptions)
         end
         function element:Refresh(newItems, keep)
             items = newItems
-            if not keep then selected = items[1] or ""; selLabel.Text = tostring(selected); element.Value = selected end
+            if not keep then
+                if isMulti then
+                    selected = {}
+                else
+                    selected = items[1] or ""
+                end
+                selLabel.Text = getSelectedText()
+                element.Value = selected
+            end
             buildOptions()
         end
         if flag then element.Flag = flag; PittikUI.Flags[flag] = element end
         table.insert(self.Elements, element)
+        return element
+    end
         return element
     end
 
