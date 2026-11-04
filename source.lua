@@ -4,10 +4,63 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
-local CoreGui = game:GetService("CoreGui")
+local CoreGui = nil
+pcall(function() CoreGui = game:GetService("CoreGui") end)
 
 local Player = Players.LocalPlayer
-local Mouse = Player:GetMouse()
+if not Player then
+    local startTime = tick()
+    while not Player and tick() - startTime < 3 do
+        task.wait(0.1)
+        Player = Players.LocalPlayer
+    end
+end
+local Mouse = (Player and pcall(function() return Player:GetMouse() end) and Player:GetMouse()) or nil
+
+local function hostGui(gui)
+    pcall(function()
+        if gethui then
+            gui.Parent = gethui()
+        end
+    end)
+    if not gui.Parent then
+        pcall(function()
+            if syn and syn.protect_gui and CoreGui then
+                syn.protect_gui(gui)
+                gui.Parent = CoreGui
+            end
+        end)
+    end
+    if not gui.Parent then
+        pcall(function()
+            local pg = Player and (Player:FindFirstChild("PlayerGui") or Player:WaitForChild("PlayerGui", 5))
+            if pg then gui.Parent = pg end
+        end)
+    end
+    if not gui.Parent and CoreGui then
+        pcall(function() gui.Parent = CoreGui end)
+    end
+    return gui
+end
+
+local function sweepGui(name)
+    pcall(function()
+        if gethui then
+            local g = gethui():FindFirstChild(name)
+            if g then g:Destroy() end
+        end
+        if Player and Player:FindFirstChild("PlayerGui") then
+            local g = Player.PlayerGui:FindFirstChild(name)
+            if g then g:Destroy() end
+        end
+        if CoreGui then
+            pcall(function()
+                local g = CoreGui:FindFirstChild(name)
+                if g then g:Destroy() end
+            end)
+        end
+    end)
+end
 
 local PittikUI = {
     Version = "1.0",
@@ -357,25 +410,14 @@ local NotifContainer, NotifGui
 
 local function EnsureNotifContainer()
     if NotifContainer then return end
+    sweepGui("PittikUINotifs")
 
     NotifGui = Util.Create("ScreenGui", {
         Name = "PittikUINotifs",
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
         ResetOnSpawn = false,
     })
-    pcall(function()
-        if syn and syn.protect_gui then
-            syn.protect_gui(NotifGui)
-            NotifGui.Parent = CoreGui
-        elseif gethui then
-            NotifGui.Parent = gethui()
-        else
-            NotifGui.Parent = CoreGui
-        end
-    end)
-    if not NotifGui.Parent then
-        NotifGui.Parent = Player:WaitForChild("PlayerGui")
-    end
+    hostGui(NotifGui)
 
     NotifContainer = Util.Create("Frame", {
         Name = "NotifContainer",
@@ -519,12 +561,14 @@ function PittikUI:ResolveAsset(icon)
     if not icon or icon == "" or icon == "default" then
         if getAsset and writefile then
             local filename = "pittik_logo_v1.png"
-            local hasFile = false
-            if isfile then
-                local s, r = pcall(isfile, filename)
-                hasFile = s and r
+            local hasValidFile = false
+            if isfile and readfile then
+                local s, content = pcall(readfile, filename)
+                if s and content and #content > 500 then
+                    hasValidFile = true
+                end
             end
-            if not hasFile then
+            if not hasValidFile then
                 local raw = Base64Decode(DEFAULT_LOGO_B64)
                 if raw and #raw > 0 then
                     pcall(writefile, filename, raw)
@@ -532,13 +576,6 @@ function PittikUI:ResolveAsset(icon)
             end
             local ok, asset = pcall(getAsset, filename)
             if ok and asset then return asset end
-
-            local gOk, body = pcall(game.HttpGet, game, "https://raw.githubusercontent.com/mkertek/pittikui/refs/heads/main/logo_white_transparent.png")
-            if gOk and body and #body > 0 then
-                pcall(writefile, filename, body)
-                local aOk, asset2 = pcall(getAsset, filename)
-                if aOk and asset2 then return asset2 end
-            end
         end
         return nil
     end
@@ -583,27 +620,14 @@ function PittikUI:CreateWindow(options)
         self.ConfigFolder = options.ConfigFolder
     end
 
-    local existing = CoreGui:FindFirstChild("PittikUIMain")
-    if existing then existing:Destroy() end
+    sweepGui("PittikUIMain")
 
     local screenGui = Util.Create("ScreenGui", {
         Name = "PittikUIMain",
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
         ResetOnSpawn = false,
     })
-    pcall(function()
-        if syn and syn.protect_gui then
-            syn.protect_gui(screenGui)
-            screenGui.Parent = CoreGui
-        elseif gethui then
-            screenGui.Parent = gethui()
-        else
-            screenGui.Parent = CoreGui
-        end
-    end)
-    if not screenGui.Parent then
-        screenGui.Parent = Player:WaitForChild("PlayerGui")
-    end
+    hostGui(screenGui)
 
     EnsureNotifContainer()
 
